@@ -26,6 +26,7 @@ if [ ! -f /.dockerenv ]; then
   exiterr "This script ONLY runs in a Docker container."
 fi
 
+net_iface=${VPN_NET_IFACE:-'eth0'}
 VPN_IPSEC_PSK="$(awk '{print $5}' /etc/ipsec.secrets | cut -d'"' -f2)"
 
 if [ -z "$VPN_IPSEC_PSK" ]; then
@@ -161,11 +162,11 @@ $SYST net.ipv4.conf.default.accept_redirects=0
 $SYST net.ipv4.conf.all.send_redirects=0
 $SYST net.ipv4.conf.default.send_redirects=0
 $SYST net.ipv4.conf.lo.send_redirects=0
-$SYST net.ipv4.conf.eth0.send_redirects=0
+$SYST net.ipv4.conf.$net_iface.send_redirects=0
 $SYST net.ipv4.conf.all.rp_filter=0
 $SYST net.ipv4.conf.default.rp_filter=0
 $SYST net.ipv4.conf.lo.rp_filter=0
-$SYST net.ipv4.conf.eth0.rp_filter=0
+$SYST net.ipv4.conf.$net_iface.rp_filter=0
 $SYST net.ipv4.icmp_echo_ignore_broadcasts=1
 $SYST net.ipv4.icmp_ignore_bogus_error_responses=1
 $SYST net.core.wmem_max=12582912
@@ -178,17 +179,17 @@ iptables -I INPUT 1 -p udp -m multiport --dports 500,4500 -j ACCEPT
 iptables -I INPUT 2 -p udp --dport 1701 -m policy --dir in --pol ipsec -j ACCEPT
 iptables -I INPUT 3 -p udp --dport 1701 -j DROP
 iptables -I FORWARD 1 -m conntrack --ctstate INVALID -j DROP
-iptables -I FORWARD 2 -i eth+ -o ppp+ -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-iptables -I FORWARD 3 -i ppp+ -o eth+ -j ACCEPT
+iptables -I FORWARD 2 -i "$net_iface" -o ppp+ -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -I FORWARD 3 -i ppp+ -o "$net_iface" -j ACCEPT
 iptables -I FORWARD 4 -i ppp+ -o ppp+ -s 192.168.42.0/24 -d 192.168.42.0/24 -j ACCEPT
-iptables -I FORWARD 5 -i eth+ -d 192.168.43.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-iptables -I FORWARD 6 -s 192.168.43.0/24 -o eth+ -j ACCEPT
+iptables -I FORWARD 5 -i "$net_iface" -d 192.168.43.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -I FORWARD 6 -s 192.168.43.0/24 -o "$net_iface" -j ACCEPT
 # Uncomment to DROP traffic between VPN clients themselves
 # iptables -I FORWARD 2 -i ppp+ -o ppp+ -s 192.168.42.0/24 -d 192.168.42.0/24 -j DROP
 # iptables -I FORWARD 3 -s 192.168.43.0/24 -d 192.168.43.0/24 -j DROP
 iptables -A FORWARD -j DROP
-iptables -t nat -I POSTROUTING -s 192.168.43.0/24 -o eth+ -m policy --dir out --pol none -j SNAT --to-source "$PRIVATE_IP"
-iptables -t nat -I POSTROUTING -s 192.168.42.0/24 -o eth+ -j SNAT --to-source "$PRIVATE_IP"
+iptables -t nat -I POSTROUTING -s 192.168.43.0/24 -o "$net_iface" -m policy --dir out --pol none -j SNAT --to-source "$PRIVATE_IP"
+iptables -t nat -I POSTROUTING -s 192.168.42.0/24 -o "$net_iface" -j SNAT --to-source "$PRIVATE_IP"
 
 # Load IPsec NETKEY kernel module
 modprobe af_key
