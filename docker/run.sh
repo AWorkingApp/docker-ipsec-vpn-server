@@ -43,7 +43,8 @@ PUBLIC_IP=${VPN_PUBLIC_IP:-''}
 
 # Try to auto discover IPs of this server
 [ -z "$PUBLIC_IP" ] && PUBLIC_IP=$(dig @resolver1.opendns.com -t A -4 myip.opendns.com +short)
-PRIVATE_IP=$(ip -4 route get 1 | awk '{print $NF;exit}')
+# PRIVATE_IP=$(ip -4 route get 1 | awk '{print $NF;exit}')
+PRIVATE_IP='10.12.0.5'
 
 # Check IPs for correct format
 check_ip "$PUBLIC_IP" || PUBLIC_IP=$(wget -t 3 -T 15 -qO- http://whatismyip.akamai.com)
